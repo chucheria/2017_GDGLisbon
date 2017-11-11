@@ -1,0 +1,222 @@
+---
+title: "Intro to data analytics with Tidyverse"
+subtitle: "GDG Lisbon 2017-11-11"
+output: 
+  html_notebook:
+    toc: true
+    toc_depth: 4
+    css: style.css
+---
+
+This is an introduction to data analytics with the *tidyverse* tools. We will look over several functions and packages included in *tidyverse* and the reason why we use these tools. As organiser of an R-Ladies community, I heard more than once that doing analytics and data science with **R** is not an easy thing because of the language, I always answer the same thing: first learn *tidyverse*, get used to the language, and then you'll find a bunch of new possibilities!
+
+This notebook goes with the presentation which contains the main points of the code below.
+
+### The tidyverse
+
+*Tidyverse* is a collection of R packages to cover the Data Science path. 
+What do I mean? With this collection we can *import*, *tidy*, *wrangle*, *visualise*, and *model* data, which is basically the path of data.
+
+![](http://r4ds.had.co.nz/diagrams/data-science.png)
+
+The list below has all packages in the collection:
+The bold lines are the core of tidyverse which are loaded with `library(tidyverse)`.
+
+Import
+
+- **[readr](http://readr.tidyverse.org/)**: fast and friendly way to read rectangular data.
+- [readxl](http://readxl.tidyverse.org/): get data out of Excel and into R.
+- [haven](http://haven.tidyverse.org/): read and write various data formats used by other statistical packages.
+- [dbplyr](http://dbplyr.tidyverse.org/): database backend for dplyr.
+
+Wrangle
+
+- **[tidyr](http://tidyr.tidyverse.org/)**: create tidy data.
+- **[dplyr](http://dplyr.tidyverse.org/)**: data manipulation.
+- **[ggplot2](http://ggplot2.tidyverse.org/)**: declaratively creating graphic.
+- **[tibble](http://tibble.tidyverse.org/)**: modern reimagining of the data.frame.
+- **[stringr](http://stringr.tidyverse.org/)**: work with strings as easy as posssible.
+- [lubridate](http://lubridate.tidyverse.org/): work with date-times.
+- [forcats](http://forcats.tidyverse.org/): tools that solve common problems with factors.
+- [hms](https://github.com/tidyverse/hms): storing durations or time-of-day values.
+- [blob](https://github.com/tidyverse/blob): represent a vector of binary objects.
+
+Program
+
+- **[purrr](http://purrr.tidyverse.org/)**: functional programming (FP) toolkit.
+- [rlang](http://rlang.tidyverse.org/): tools to work with core language features.
+- [magrittr](http://magrittr.tidyverse.org/): make your code more readable.
+- [glue](https://github.com/tidyverse/glue): Glue strings to data.
+
+Model
+
+- [modelr](https://github.com/tidyverse/modelr): help you create elegant pipelines when modelling.
+- [broom](https://github.com/tidyverse/broom): messy output of built-in functions and turns them into tidy data frames.
+
+Share 
+- [reprexr](http://reprex.tidyverse.org/): Prepare reprexes (reproducible examples).
+
+### base:: vs tidyverse::
+
+I won't go into why you could find R difficult, there's multiple reasons why you shouldn't find it intuitive or unhelpful. What I'm going to do is to name advantages of the *tidyverse* over *base* that if you keep coding with R you would find on your own:
+
+- Easy grammar.
+- Human readable.
+- Consistent syntax.
+- Coverage workflow.
+
+### Let's get the party started
+
+#### Load dependencies
+
+```{r setup, message=FALSE}
+knitr::opts_chunk$set(message=FALSE, warning = FALSE)
+require(tidyverse)
+```
+
+Loading tidyverse will only give us the core of the collection (*tidyr*, *dplyr*, *ggplot2*, *tibble*, *purrr*), so if we need any other package along the example we will load it or call a standalone function when we need it.
+
+We use require in case we don't have the library downloaded it will do that, and for the data package it is not needed because it comes with the RStudio packages.
+
+#### Import & tidy data
+
+To get to the good stuff sooner, let's import a clean dataset and see if there's something we would like to tidy or add. We are going to load _repurrrsive_ which contains _sw\_people_, _sw\_films_, _sw\_species_, _sw\_planets_, _sw\_starships_ and _sw\_vehicles_ lists interrelated. This is similar to the data you'll find if you import a JSON.
+
+Let's inspect a bit of the data and put it in an rectangular form.
+
+```{r spec}
+library(repurrrsive)
+str(sw_people[1])
+
+people_tbl <- tibble(
+  name    = sw_people %>% map_chr("name"), 
+  films   = sw_people %>% map("films"),
+  height  = sw_people %>% map_chr("height") %>% 
+    readr::parse_number(na = "unknown"),
+  eye_color = sw_people %>% map_chr("eye_color"),
+  species = sw_people %>% map_chr("species", .null = NA_character_)
+)
+
+people_tbl %>% head()
+people_tbl %>% nrow()
+```
+
+See what I used there? I used the **infix operator %>%** which is defined by the package _magrittr_ and heavily used in _dplyr_. We imported it before, when we called the library _tidyverse_. It works like a pipe, it passes the left side of the pipe to the first argument of the right side. And if you are assigning that, the last handling is what the variable gets. 
+
+So, instead of calling `head(people_tbl)`, I called `people_tbl %>% head()`. Here it doesn't make any difference but our workflow will improve thanks to the pipe.
+
+Let's count the number of films in which every character has participated and discard the _films_ column.
+
+```{r}
+people_tbl <- people_tbl %>%
+  mutate(
+    n_films = map_int(films, length)
+  ) %>% 
+  select(-films)
+
+people_tbl
+```
+
+This looks almost tidy.
+
+What are those species? Let's look them in the _sw\_species_ list.
+
+```{r}
+species_tbl <- tibble(
+  specie      = sw_species %>% map_chr("name"), 
+  language  = sw_species %>% map_chr("language"),
+  url       = sw_species %>% map_chr("url")
+)
+
+species_tbl
+
+people_tbl <- left_join(people_tbl, species_tbl, by = c("species" = "url")) %>%
+  select(-species)
+```
+
+#### Wragling data
+
+Let's explore our data! 💃
+
+Out of curiosity, let's see which specie has more blue-eyed people.
+
+```{r blue-eyed}
+
+blue_eyed <- people_tbl %>%
+  filter(eye_color == 'blue') %>%
+  group_by(specie) %>%
+  summarise(count = n()) %>%
+  arrange(desc(count)) %>%
+  head(1)
+
+blue_eyed
+```
+
+Now, let's use a bit of visualization to explore the data visually to use the knowledge in our model.
+
+```{r}
+summary(people_tbl)
+
+ggplot(people_tbl, aes(height, color = specie)) +
+  geom_density(alpha = 0.5) +
+  theme(legend.position="bottom") +
+  labs(title="Height per specie")
+```
+
+#### Model
+
+To model the data let's put all we learnt in practice with another - bigger - dataset and predict. 
+
+```{r}
+library(readr)
+library(modelr)
+library(broom)
+library(randomForest)
+
+wine_quality <- read_csv2('https://raw.githubusercontent.com/chucheria/2017_GDGLisbon/master/winequality-white.csv')
+
+wine_quality <- wine_quality %>%
+  mutate_if(is.character, as.double)
+summary(wine_quality)
+
+wine_quality <- wine_quality %>%
+  mutate(taste = ifelse(quality > 6, 1, 
+                        ifelse(quality == 6, 0, -1)))
+
+ggplot(wine_quality, aes(quality, fill = factor(taste))) +
+  geom_bar() + 
+  labs(title='Map wine quality') + 
+  guides(fill=guide_legend(title=NULL))
+
+model_lm <- lm(formula = taste ~ quality, data = wine_quality)
+model_rf <- randomForest(formula = taste ~ quality, data = wine_quality)
+
+model_lm %>% tidy()
+model_lm %>% 
+    augment() %>% 
+    head()
+
+grid_gather <- data_grid(wine_quality, quality, .model = model_lm) %>% 
+    gather_predictions(model_lm, model_rf)
+grid_gather %>% head()
+
+ggplot(data = wine_quality, aes(x = quality, y = taste)) + 
+  geom_point() + 
+  geom_line(data = grid_gather, aes(x = quality, y = pred, color = as.factor(model))) + 
+  ggtitle("Model Predictions")
+
+```
+
+Obviously, linear models are no good in this case for classification but the example fits to see all the advantages modelr and broom gives you in your model workflow.
+
+### Conclusion
+
+Tidyverse will give you a flexibility you only can dream with R. Of course it is very specific to data analytics and to play with data but it will introduce you to R nicely which at the end gives you a lot of possibilities. From analytics to creating your own website with R. 
+
+### Resources
+
+- [R for Data Science - Garrett Grolemund & Hadley Wickham](http://r4ds.had.co.nz/)
+- [Tidyverse](https://www.tidyverse.org/)
+- [Teaching data science to new useRs - Mine Cetinkaya-Rundel](https://channel9.msdn.com/Events/useR-international-R-User-conferences/useR-International-R-User-2017-Conference/KEYNOTE-Teaching-data-science-to-new-useRs)
+
+- [Tidy Data](https://cran.r-project.org/web/packages/tidyr/vignettes/tidy-data.html)
