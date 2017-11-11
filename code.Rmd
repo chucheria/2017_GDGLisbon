@@ -74,7 +74,7 @@ knitr::opts_chunk$set(message=FALSE, warning = FALSE)
 require(tidyverse)
 ```
 
-Loading tidyverse will only give us the core of the collection (*tidyr*, *dplyr*, *ggplot2*, *tibble*, *purrr*), so if we need any other package along the example we will load it or call a standalone function when we need it.
+Loading tidyverse will only give us the core of the collection (*tidyr*, *stringr*, *dplyr*, *ggplot2*, *tibble*, *purrr*), so if we need any other package along the example we will load it or call a standalone function when we need it.
 
 We use require in case we don't have the library downloaded it will do that, and for the data package it is not needed because it comes with the RStudio packages.
 
@@ -88,6 +88,7 @@ Let's inspect a bit of the data and put it in an rectangular form.
 library(repurrrsive)
 str(sw_people[1])
 
+## With tidyverse
 people_tbl <- tibble(
   name    = sw_people %>% map_chr("name"), 
   films   = sw_people %>% map("films"),
@@ -105,6 +106,24 @@ See what I used there? I used the **infix operator %>%** which is defined by the
 
 So, instead of calling `head(people_tbl)`, I called `people_tbl %>% head()`. Here it doesn't make any difference but our workflow will improve thanks to the pipe.
 
+```{r include=FALSE}
+## Without tidyverse
+people_names <- sapply(sw_people, '[[', 'name')
+people_films <- sapply(sw_people, function(x) x[['films']])
+people_height <- sapply(sw_people, function(x) x[['height']])
+people_height[people_height == 'unknown'] <- NA
+people_eye_color <- sapply(sw_people, '[[', 'eye_color')
+people_species <- unlist(sapply(sw_people, '[[', 'species'))
+people_species[people_species == NULL] <- NA
+
+people_no <- do.call(rbind.data.frame, Map(cbind, people_names, people_films,
+                                           people_height, people_eye_color,
+                                           people_species))
+
+colnames(people_no) <- c('name', 'films', 'height', 'eye_color', 'species')
+rownames(people_no) <- c()
+
+```
 Let's count the number of films in which every character has participated and discard the _films_ column.
 
 ```{r}
@@ -143,12 +162,17 @@ Out of curiosity, let's see which specie has more blue-eyed people.
 ```{r blue-eyed}
 
 blue_eyed <- people_tbl %>%
-  filter(eye_color == 'blue') %>%
+  filter(eye_color == 'blue') 
+blue_eyed
+
+blue_eyed <- blue_eyed %>%
   group_by(specie) %>%
-  summarise(count = n()) %>%
+  summarise(count = n()) 
+blue_eyed
+
+blue_eyed <- blue_eyed%>%
   arrange(desc(count)) %>%
   head(1)
-
 blue_eyed
 ```
 
@@ -160,9 +184,19 @@ summary(people_tbl)
 ggplot(people_tbl, aes(height, color = specie)) +
   geom_density(alpha = 0.5) +
   theme(legend.position="bottom") +
-  labs(title="Height per specie")
+  labs(title="Height per specie") + 
+  theme(legend.text=element_text(size=5)) +
+  guides(color=guide_legend(ncol=9))
 ```
 
+```{r}
+## Without tidyverse
+
+height_vul <- people_tbl$height[people_tbl$specie == 'Human']
+height_vul <- height_vul[!(is.na(height_vul))]
+
+plot(density(height_vul), main="Height per specie", xlab="height")
+```
 #### Model
 
 To model the data let's put all we learnt in practice with another - bigger - dataset and predict. 
@@ -217,6 +251,6 @@ Tidyverse will give you a flexibility you only can dream with R. Of course it is
 
 - [R for Data Science - Garrett Grolemund & Hadley Wickham](http://r4ds.had.co.nz/)
 - [Tidyverse](https://www.tidyverse.org/)
+- [Hadley Wickham](http://hadley.nz/)
 - [Teaching data science to new useRs - Mine Cetinkaya-Rundel](https://channel9.msdn.com/Events/useR-international-R-User-conferences/useR-International-R-User-2017-Conference/KEYNOTE-Teaching-data-science-to-new-useRs)
-
 - [Tidy Data](https://cran.r-project.org/web/packages/tidyr/vignettes/tidy-data.html)
