@@ -106,7 +106,7 @@ See what I used there? I used the **infix operator %>%** which is defined by the
 
 So, instead of calling `head(people_tbl)`, I called `people_tbl %>% head()`. Here it doesn't make any difference but our workflow will improve thanks to the pipe.
 
-```{r include=FALSE}
+```{r}
 ## Without tidyverse
 people_names <- sapply(sw_people, '[[', 'name')
 people_films <- sapply(sw_people, function(x) x[['films']])
